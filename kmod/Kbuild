@@ -1,0 +1,2 @@
+obj-m := mmpeephole.o
+EXTRA_CFLAGS := -I$(src)/../include
