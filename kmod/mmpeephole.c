@@ -42,8 +42,8 @@ struct mmph_cmd_entry {
 };
 
 static struct mmph_cmd_entry mmph_cmd_table[] = {
-	{ MMPH_IOC_CMD_MMAP, mmph_mmap_handler_name },
-	{ MMPH_IOC_CMD_VM_OPS, mmph_region_vm_ops_name},
+	{ MMPH_IOC_CMD_SYM_MMAP, mmph_mmap_handler_name },
+	{ MMPH_IOC_CMD_SYM_VM_OPS, mmph_region_vm_ops_name},
 	{ 0, NULL },
 };
 
@@ -98,7 +98,7 @@ mmph_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 	long (*h)(uint64_t, char *, size_t) = NULL;
 	char namebuf[MMPH_NAME_LEN];
 
-	struct mmph_ioc_param *uptr = (struct mmph_ioc_param *)arg;
+	struct mmph_ioc_sym_param *uptr = (struct mmph_ioc_sym_param *)arg;
 
 	copystatus = get_user(param, &uptr->param);
 	if (copystatus != 0) {

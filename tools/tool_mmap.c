@@ -10,7 +10,7 @@
 void
 print_mmap_handler(int mmph, const char *fname)
 {
-	struct mmph_ioc_param ioc_param;
+	struct mmph_ioc_sym_param ioc_param;
 	int testfd;
 	long ret;
 	testfd = open(fname, O_RDONLY);
@@ -19,7 +19,7 @@ print_mmap_handler(int mmph, const char *fname)
 		return;
 	}
 	ioc_param.param = testfd;
-	ret = ioctl(mmph, MMPH_IOC_CMD_MMAP, &ioc_param);
+	ret = ioctl(mmph, MMPH_IOC_CMD_SYM_MMAP, &ioc_param);
 	if (ret == -1) {
 		fprintf(stderr, "ioctl MMPH_IOC_CMD_MMAP (file=%s): %s\n",
 		        fname, strerror(errno));
