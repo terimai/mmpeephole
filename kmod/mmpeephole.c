@@ -18,8 +18,12 @@ static int mmph_release(struct inode *, struct file *);
 
 static int mmph_mmap(struct file *, struct vm_area_struct *);
 
+typedef long mmph_ioc_sym_func(uint64_t, char *, size_t);
+static long call_mmph_ioc_sym_param_func(mmph_ioc_sym_func *, void *);
 static long mmph_mmap_handler_name(uint64_t, char *, size_t);
 static long mmph_region_vm_ops_name(uint64_t, char *, size_t);
+
+static long mmph_ioc_mmap_handler_name(void *);
 
 static struct file_operations mmph_fops = {
 	.owner = THIS_MODULE,
@@ -36,16 +40,46 @@ static struct miscdevice mmph_dev = {
 	.fops = &mmph_fops,
 };
 
+
+#define MMPH_MK_IOC_SYM_HANDLER(ioc_hdl_name, func_name) \
+static long \
+ioc_hdl_name(void *arg)\
+{\
+	return call_mmph_ioc_sym_param_func(func_name, arg);\
+}
+
+MMPH_MK_IOC_SYM_HANDLER(mmph_ioc_mmap_handler_name, mmph_mmap_handler_name)
+MMPH_MK_IOC_SYM_HANDLER(mmph_ioc_region_vm_ops_name, mmph_region_vm_ops_name)
+
 struct mmph_cmd_entry {
 	int cmd;
-	long (*handler)(uint64_t, char *, size_t);
+	long (*handler)(void *);
 };
 
 static struct mmph_cmd_entry mmph_cmd_table[] = {
-	{ MMPH_IOC_CMD_SYM_MMAP, mmph_mmap_handler_name },
-	{ MMPH_IOC_CMD_SYM_VM_OPS, mmph_region_vm_ops_name},
+	{ MMPH_IOC_CMD_SYM_MMAP, mmph_ioc_mmap_handler_name },
+	{ MMPH_IOC_CMD_SYM_VM_OPS, mmph_ioc_region_vm_ops_name},
 	{ 0, NULL },
 };
+
+static long
+call_mmph_ioc_sym_param_func(mmph_ioc_sym_func *fn, void *arg)
+{
+	long retval, copystatus;
+	struct mmph_ioc_sym_param *uptr = arg;
+	struct mmph_ioc_sym_param kp;
+	copystatus = get_user(kp.param, &uptr->param);
+	if (copystatus != 0) {
+		return -EFAULT;
+	}
+	retval = fn(kp.param, kp.name, sizeof(kp.name));
+	copystatus = copy_to_user(&uptr->name, kp.name, sizeof(kp.name));
+	if (copystatus != 0) {
+		return -EFAULT;
+	}
+	return retval;
+}
+
 
 static int
 mmph_mmap(struct file *filp, struct vm_area_struct *vma)
@@ -92,18 +126,9 @@ mmph_region_vm_ops_name(uint64_t addr, char *namebuf, size_t size)
 static long
 mmph_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 {
-	long retval, copystatus;
-	uint64_t param;
 	struct mmph_cmd_entry *e;
-	long (*h)(uint64_t, char *, size_t) = NULL;
-	char namebuf[MMPH_NAME_LEN];
-
-	struct mmph_ioc_sym_param *uptr = (struct mmph_ioc_sym_param *)arg;
-
-	copystatus = get_user(param, &uptr->param);
-	if (copystatus != 0) {
-		return -EFAULT;
-	}
+	long retval;
+	long (*h)(void *) = NULL;
 
 	/* search handler */
 	for (e = mmph_cmd_table; e->cmd != 0 && e->handler != NULL; ++e) {
@@ -116,12 +141,8 @@ mmph_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 		       ": ioctl(cmd %d) is not found\n", cmd);
 		return -EINVAL;
 	}
-	retval = h(param, namebuf, sizeof(namebuf));
+	retval = h((void *)arg);
 
-	copystatus = copy_to_user(&uptr->name, namebuf, sizeof(namebuf));
-	if (copystatus != 0) {
-		return -EFAULT;
-	}
 	return retval;
 }
 
